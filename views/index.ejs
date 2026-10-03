@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice to Text Transcriber</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/transcriber.js" defer></script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Voice to Text Transcriber</h1>
+      <p>Transcribe up to 5 <code>.mp3</code> or <code>.opus</code> files at once.</p>
+
+      <form id="transcription-form" action="/transcribe" method="post" enctype="multipart/form-data">
+        <label for="audio">Audio files</label>
+        <p id="upload-hint" class="muted">Choose 1 to 5 files. Results will follow the order shown below.</p>
+        <input id="audio" type="file" name="audio" accept=".mp3,.opus,audio/mpeg,audio/opus" multiple required aria-describedby="upload-hint selection-error" />
+        <div id="selection-summary" hidden>
+          <p id="selection-count" role="status"></p>
+          <ol id="selected-files" class="selected-files"></ol>
+        </div>
+        <p id="selection-error" class="error-text" role="alert"></p>
+        <button id="transcribe-button" type="submit">Transcribe</button>
+      </form>
+      <p id="processing-status" role="status"></p>
+
+      <%
+        const successfulCount = results.filter(result => result.success).length;
+        const failedCount = results.length - successfulCount;
+        // The legacy error value also includes per-file summaries, shown below instead.
+        const isFileError = results.length === 1 && !results[0].success && error === results[0].error;
+        const isBatchError = failedCount > 0 && error === `${failedCount} of ${results.length} files could not be transcribed.`;
+      %>
+      <% if (error && !isFileError && !isBatchError) { %>
+      <section class="panel error" role="alert" aria-labelledby="request-error-title">
+        <h2 id="request-error-title">Unable to process this request</h2>
+        <p><%= error %></p>
+      </section>
+      <% } %>
+
+      <% if (results.length > 0) { %>
+      <section aria-labelledby="results-title">
+        <h2 id="results-title">Results</h2>
+        <p class="batch-summary"><%= successfulCount %> of <%= results.length %> <%= results.length === 1 ? "file" : "files" %> transcribed successfully.
+          <% if (failedCount > 0) { %>
+          <span class="error-text"><%= failedCount %> <%= failedCount === 1 ? "file" : "files" %> failed.</span>
+          <% } %>
+        </p>
+        <ol class="result-list">
+          <% results.forEach((result, position) => { %>
+          <li>
+            <article class="panel result-card <%= result.success ? "success" : "error" %>" aria-labelledby="result-title-<%= position %>">
+              <h3 id="result-title-<%= position %>"><span class="result-number"><%= position + 1 %>.</span> <%= result.filename %></h3>
+              <p class="result-status"><%= result.success ? "Transcribed successfully" : "Failed" %></p>
+              <% if (result.success) { %>
+                <% if (result.transcript.trim()) { %>
+                <pre><%= result.transcript %></pre>
+                <% } else { %>
+                <p class="muted">No speech was detected in this file.</p>
+                <% } %>
+              <% } else { %>
+              <p><%= result.error %></p>
+              <% } %>
+            </article>
+          </li>
+          <% }); %>
+        </ol>
+      </section>
+      <% } %>
+
+      <% if (successfulCount > 0) { %>
+      <section id="combined-panel" class="panel combined-panel" aria-labelledby="combined-title">
+        <h2 id="combined-title">Combined transcript</h2>
+        <div id="export-actions" class="actions" hidden>
+          <button id="copy-all" type="button">Copy All</button>
+          <button id="download-all" class="secondary" type="button">Download All</button>
+        </div>
+        <p id="export-status" role="status"></p>
+        <pre id="combined-transcript" tabindex="0" aria-labelledby="combined-title"><%= combinedTranscript %></pre>
+        <!-- JSON in escaped textarea text preserves original line endings on export. -->
+        <textarea id="combined-source" hidden><%= JSON.stringify(combinedTranscript) %></textarea>
+        <noscript><p>Select the combined text to copy it. Enable JavaScript to use Copy All and Download All.</p></noscript>
+      </section>
+      <% } %>
+    </main>
+  </body>
+</html>
